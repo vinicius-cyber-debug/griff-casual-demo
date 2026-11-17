@@ -1,0 +1,15 @@
+{
+  "name": "griff-casual-streetwear",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "build:pages": "node scripts/build.mjs --pages",
+    "preview": "node scripts/build.mjs --serve",
+    "test": "node --test src/shop.test.js"
+  },
+  "dependencies": {"react": "19.3.1", "react-dom": "19.3.1"},
+  "devDependencies": {"esbuild": "0.28.2"}
+}
