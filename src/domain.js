@@ -38,6 +38,8 @@ export function applyCommand(previous, command, options = {}) {
   switch (command.type) {
     case 'products.save': {
       const old = data.id ? state.products.find(p => p.id === data.id) : null; if (data.id && !old) fail('Produto não encontrado.');
+      if (old && data.expectedUpdatedAt && old.updatedAt !== data.expectedUpdatedAt) fail('Este cadastro foi alterado em outra sessão. Feche e abra a edição novamente para revisar os dados atuais.');
+      if (old && Array.isArray(data.expectedStock) && data.expectedStock.some(v => old.variants.find(current => current.id === v.id)?.stock !== v.stock)) fail('O estoque mudou enquanto esta edição estava aberta. Feche e abra a roupa novamente antes de salvar.');
       const sku = requireText(data.sku, 'o código SKU', 60).toUpperCase(); if (state.products.some(p => p.id !== data.id && p.sku === sku)) fail('Já existe um produto com este SKU.');
       if (!state.categories.includes(data.category)) fail('Escolha uma categoria cadastrada.');
       if (!['active', 'draft', 'archived'].includes(data.status)) fail('Status inválido.');
