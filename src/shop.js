@@ -11,26 +11,29 @@ export const products = [
 
 export const money = cents => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 export const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-export function filterProducts({ category = 'Todos', query = '', favoritesOnly = false, favorites = [], sort = 'featured' } = {}) {
-  const result = products.filter(p => (category === 'Todos' || p.category === category || p.collection === category) && (!favoritesOnly || favorites.includes(p.id)) && normalize(`${p.name} ${p.category} ${p.collection}`).includes(normalize(query.trim())));
+export function filterProducts({ category = 'Todos', query = '', favoritesOnly = false, favorites = [], sort = 'featured' } = {}, catalog = products) {
+  const result = catalog.filter(p => (category === 'Todos' || p.category === category || p.collection === category) && (!favoritesOnly || favorites.includes(p.id)) && normalize(`${p.name} ${p.category} ${p.collection}`).includes(normalize(query.trim())));
   if (sort === 'price-asc') result.sort((a, b) => a.price - b.price);
   if (sort === 'price-desc') result.sort((a, b) => b.price - a.price);
   return result;
 }
-export function sanitizeCart(value) {
+export function sanitizeCart(value, catalog = products) {
   if (!Array.isArray(value)) return [];
   const result = [];
   for (const row of value) {
-    const p = products.find(p => p.id === row?.id);
+    const p = catalog.find(p => p.id === row?.id);
     if (!p || !p.sizes.includes(row.size) || !Number.isInteger(row.qty) || row.qty < 1) continue;
-    const existing = result.find(x => x.id === row.id && x.size === row.size);
-    if (existing) existing.qty = Math.min(10, existing.qty + row.qty);
-    else result.push({ id: row.id, size: row.size, qty: Math.min(10, row.qty) });
+    const variant = p.variants?.find(v => row.variantId ? v.id === row.variantId && v.size === row.size : v.size === row.size && (!row.color || v.color === row.color));
+    if (p.variants && (!variant || variant.stock < 1)) continue;
+    const limit = Math.min(10, variant?.stock ?? 10);
+    const existing = result.find(x => x.id === row.id && (variant ? x.variantId === variant.id : x.size === row.size));
+    if (existing) existing.qty = Math.min(limit, existing.qty + row.qty);
+    else result.push({ id: row.id, size: row.size, qty: Math.min(limit, row.qty), ...(variant ? {variantId:variant.id,color:variant.color} : {}) });
   }
   return result;
 }
-export function calculateTotals(cart) {
-  const lines = sanitizeCart(cart).map(row => ({ ...row, product: products.find(p => p.id === row.id) }));
+export function calculateTotals(cart, catalog = products) {
+  const lines = sanitizeCart(cart, catalog).map(row => ({ ...row, product: catalog.find(p => p.id === row.id) }));
   const subtotal = lines.reduce((total, row) => total + row.product.price * row.qty, 0);
   return { lines, subtotal, quantity: lines.reduce((n, row) => n + row.qty, 0) };
 }

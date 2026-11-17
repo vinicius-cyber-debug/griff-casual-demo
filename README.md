@@ -1,48 +1,92 @@
-# Griff Casual — vitrine streetwear
+# Griff Casual — loja e painel administrativo
 
-Primeira versão em React da loja Griff Casual, com verde, preto e a imagem original enviada pelo responsável pela marca. Instagram: https://www.instagram.com/griff.casual/
+Vitrine streetwear em React, com painel administrativo, Supabase Auth, PostgreSQL e Supabase Storage.
 
-## Rodar no computador
+- Vitrine: https://vinicius-cyber-debug.github.io/griff-casual-demo/
+- Administração com login: https://vinicius-cyber-debug.github.io/griff-casual-demo/#/admin
+- Painel de demonstração: https://vinicius-cyber-debug.github.io/griff-casual-demo/?demo=1#/admin
 
-Requer Node.js 22.12 ou superior e npm.
+## Recursos
+
+- Cadastro, edição, duplicação e arquivamento de roupas.
+- Até cinco fotos por roupa; otimização de imagens e biblioteca reutilizável.
+- Categorias e variações de tamanho/cor com SKU, estoque, custo, preço e preço anterior.
+- Entradas e saídas de estoque, alertas e histórico de movimentações.
+- Pedidos manuais com reserva de estoque, pagamento, preparação, envio, entrega, cancelamento e devolução.
+- Clientes e histórico de pedidos; cupons percentuais ou fixos com validade e limites.
+- Despesas, receita recebida, ticket médio, resultado estimado e ranking de produtos.
+- Exportação CSV e JSON, configurações da loja e registro das últimas alterações.
+- Busca, favoritos e sacola na vitrine; produtos ativos são lidos do catálogo público do Supabase.
+
+## Acesso real e demonstração
+
+O endereço normal usa o Supabase. A administração exige um link de acesso enviado pelo Supabase ao e-mail autorizado. O login é conferido novamente no servidor e o e-mail precisa constar na tabela privada `griff_admin_emails`.
+
+O parâmetro `?demo=1` abre uma demonstração isolada, com dados fictícios no IndexedDB do navegador. Ela não modifica o banco real. Não cadastre dados pessoais reais na demonstração.
+
+O catálogo inicial tem oito produtos ilustrativos, preservando a vitrine original. No ambiente real, pedidos, clientes, cupons e despesas começam vazios. Substitua fotos, descrições, tamanhos, custos e preços antes de operar uma loja real.
+
+## Rodar localmente
+
+Requer Node.js 22.12 ou superior e npm:
 
 ```sh
 npm install
 npm run dev
 ```
 
-Abra a URL exibida no terminal. Para gerar os arquivos de publicação: `npm run build`. Para verificar a lógica de busca e sacola: `npm test`.
+Abra a URL exibida no terminal. Para testar o painel sem uma conta administrativa, acrescente `?demo=1#/admin`. Para verificar as regras de negócio, execute `npm test`.
 
-## O que funciona
+```sh
+npm run build:pages
+npm run build:function
+```
 
-- Layout para celular e computador, catálogo por categoria e ordenação por preço.
-- Busca por nome, categoria ou coleção, com tratamento de acentos.
-- Favoritos e sacola persistidos no navegador.
-- Escolha de tamanho, quantidades de 1 a 10 por tamanho, remoção e subtotal em reais.
-- Resumo demonstrativo da compra e link para o Instagram.
-- Navegação por teclado, modais nativos, foco visível e suporte à preferência por movimentos reduzidos.
+A primeira tarefa gera `docs/`, publicada pelo GitHub Pages a partir de `main` e `/docs`. A segunda gera `work/griff-admin-edge.js`, a função única para publicar no editor do Supabase. `npm run build` gera `dist/` para outra hospedagem estática.
 
-## Como colocar seus produtos
+## Configuração do Supabase
 
-Edite `src/shop.js`. Os preços são inteiros em centavos: `8990` significa R$ 89,90. As fotos ficam em `public/images/`. Troque as fotos e também atualize as descrições e textos alternativos. A imagem `griff-original.jpg` foi fornecida pelo usuário e foi preservada sem alterações.
+O projeto em uso está identificado em `public/runtime.js`. A chave `sb_publishable_…` é uma chave pública de conexão; ela não dá acesso aos registros administrativos. Nunca coloque senha do banco, chave secreta, token de usuário ou chave de serviço no frontend ou no GitHub.
 
-As fotografias de catálogo e do banner são ilustrativas, obtidas no Unsplash. As origens estão em `scripts/fetch-images.mjs`. Substitua as fotografias ilustrativas por imagens dos seus produtos antes de vender. As amostras de cores são ilustrativas; nesta versão, apenas o tamanho define a variante da sacola. O arquivo original da marca tem 150 × 150 pixels: substitua por uma versão em alta resolução quando disponível.
+Para reproduzir em outro projeto:
 
-## Limites desta primeira versão
+1. Aplique os arquivos de `supabase/migrations/` na ordem indicada pelos nomes.
+2. Aplique `supabase/seed.sql` somente para iniciar o catálogo ilustrativo. O comando não sobrescreve uma loja já existente.
+3. Cadastre privadamente o e-mail do administrador, substituindo o exemplo abaixo no SQL Editor:
 
-Esta é uma vitrine funcional com dados demonstrativos. Não existem pagamentos, frete calculado, pedidos reais, autenticação, servidor, banco de dados, painel administrativo ou validação de estoque. Nada é enviado ao Instagram automaticamente. Favoritos e sacola ficam somente no navegador. Preços, nomes, tamanhos, coleções e textos institucionais são propostas e precisam ser confirmados pela marca.
+```sql
+insert into public.griff_admin_emails(email)
+values ('administrador@exemplo.com')
+on conflict (email) do nothing;
+```
 
-Para operar uma loja, será necessário cadastrar o catálogo real, integrar o backend, implementar controle de estoque, escolher pagamento e frete, e preencher as informações comerciais e políticas da empresa. Não cadastre dados pessoais nem credenciais neste frontend.
+4. Publique a função `griff-admin` com o arquivo gerado por `npm run build:function`. Ela usa as variáveis de servidor `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`, fornecidas pelo ambiente do Supabase. O handler valida cada sessão com `auth.getUser()` e consulta a lista privada de administradores.
+5. A configuração `verify_jwt = false` evita a validação antiga limitada ao segredo legado do gateway; a validação dos JWTs atuais permanece obrigatória dentro da função. O catálogo público utiliza uma função SQL separada, que retorna somente campos próprios para a vitrine.
+6. Configure a Site URL para o endereço final da vitrine e permita o retorno `https://SEU-ENDERECO/?admin=1` em Authentication > URL Configuration.
+7. Atualize `public/runtime.js` e a lista de origens permitidas da Edge Function para a nova hospedagem; gere e publique novamente o frontend.
 
-## Referência
+As tabelas administrativas têm RLS e nenhum acesso direto de `anon` ou `authenticated`. A função SQL pública não retorna clientes, pedidos, custos, despesas ou atividade. Somente fotos de produtos ficam públicas no bucket `griff-products`; o envio é autorizado no backend. Os arquivos aceitos são JPG, PNG e WebP, limitados a 1,5 MB após otimização.
 
-Ideia baseada no projeto [MERN-Stack-eCommerce-App, de ahmedsemih](https://github.com/ahmedsemih/MERN-Stack-eCommerce-App), que utiliza React, Express, Node.js e MongoDB. Esta implementação visual foi criada do zero e não copia o backend nem o código do repositório. O frontend React pode futuramente consumir uma API MERN. Não requer conta MongoDB para esta demonstração.
+## Como o estoque e as vendas funcionam
 
-## Demonstração no GitHub Pages
+Criar um pedido reserva o estoque imediatamente. O cancelamento de um pedido pendente devolve as peças uma única vez. Pedidos pagos precisam de registro de estorno/devolução. O operador escolhe se as peças voltam ao estoque. Tamanhos e cores de uma variação com histórico não podem ser reaproveitados; crie uma variação nova.
 
-- Site: https://vinicius-cyber-debug.github.io/griff-casual-demo/
-- Código: https://github.com/vinicius-cyber-debug/griff-casual-demo
+Os preços do pedido são definidos pelo servidor a partir do catálogo e ficam registrados no histórico, mesmo depois de editar o produto. As atualizações usam uma versão do banco e uma transação para impedir perda de alterações simultâneas e venda com estoque negativo. Após conflito, atualize os dados e revise a operação.
 
-A demonstração é pública e não realiza vendas. A pasta `docs/` contém a versão compilada publicada pelo GitHub Pages, com os caminhos preparados para funcionar em `/griff-casual-demo/`.
+O envio de foto é independente do cadastro: uma foto enviada pode continuar na biblioteca mesmo se o formulário da roupa for cancelado.
 
-Depois de editar produtos ou layout, execute `npm run build:pages` e envie as alterações do código e de `docs/` ao repositório. Nas configurações do GitHub Pages, use `Deploy from a branch`, branch `main` e pasta `/docs`. Não é necessário configurar segredos ou serviços pagos. Para outras hospedagens estáticas, `npm run build` gera `dist/`.
+## Limites operacionais
+
+- Pagamentos e estornos são registros manuais de operações realizadas fora do sistema. O painel não cobra cartões nem movimenta dinheiro.
+- A sacola e o checkout público continuam demonstrativos; vendas reais podem ser cadastradas pelo operador no painel. Não há emissão de nota fiscal, integração de transportadoras ou conciliação bancária.
+- O resultado financeiro é uma estimativa: receita paga menos frete, custo das peças vendidas e despesas cadastradas. Cadastre taxas e impostos como despesas. Estornos deixam de compor a receita paga.
+- A versão foi feita para uma loja pequena: até 1.000 produtos, 5.000 pedidos e um documento de dados de até 8 MB. Os últimos 500 eventos de atividade e 2.000 movimentos de estoque ficam no painel. Para maior volume, migre os registros para tabelas normalizadas e mantenha um histórico completo separado.
+- Exportar JSON salva os dados e as referências das fotos; mantenha cópia dos arquivos do Storage separadamente. Não há restauração automática de backups nesta versão.
+- A atualização do catálogo aparece na próxima leitura da vitrine. Use o botão Atualizar dados no painel para buscar alterações de outra sessão.
+- O envio de links de login está sujeito aos limites de e-mail do Supabase. Para operação comercial, configure seu próprio SMTP e acompanhe as cotas do plano.
+
+## Identidade e fotografias
+
+A imagem `public/images/griff-original.jpg` foi fornecida pelo usuário e preservada. Ela tem 150 × 150 pixels; substitua por uma versão maior quando disponível. As fotografias ilustrativas vêm do Unsplash; as origens estão em `scripts/fetch-images.mjs`.
+
+A ideia inicial veio do projeto [MERN-Stack-eCommerce-App, de ahmedsemih](https://github.com/ahmedsemih/MERN-Stack-eCommerce-App). Esta implementação foi criada do zero; o backend desta versão utiliza Supabase.

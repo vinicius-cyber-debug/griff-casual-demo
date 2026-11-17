@@ -8,8 +8,9 @@
     "build": "node scripts/build.mjs",
     "build:pages": "node scripts/build.mjs --pages",
     "preview": "node scripts/build.mjs --serve",
-    "test": "node --test src/shop.test.js"
+    "test": "node --test src/shop.test.js src/domain.test.js",
+    "build:function": "node scripts/bundle-function.mjs"
   },
-  "dependencies": {"react": "19.3.1", "react-dom": "19.3.1"},
+  "dependencies": {"react": "19.3.1", "react-dom": "19.3.1", "@supabase/supabase-js": "2.119.0"},
   "devDependencies": {"esbuild": "0.28.2"}
 }

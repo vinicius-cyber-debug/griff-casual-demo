@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateTotals, sanitizeCart, filterProducts } from './shop.js';
+test('sacola separa cores do mesmo tamanho e respeita o estoque disponível', () => {
+  const catalog=[{id:'shirt',name:'Roupa',price:1000,sizes:['M'],variants:[{id:'black-m',size:'M',color:'Preto',stock:2},{id:'green-m',size:'M',color:'Verde',stock:4}]}];
+  const cart=sanitizeCart([{id:'shirt',size:'M',variantId:'black-m',qty:8},{id:'shirt',size:'M',variantId:'green-m',qty:1}],catalog);
+  assert.equal(cart.length,2);assert.equal(cart[0].qty,2);assert.equal(cart[1].color,'Verde');assert.equal(calculateTotals(cart,catalog).subtotal,3000);
+});
 test('subtotal usa centavos e soma variantes de tamanho separadamente', () => {
   const result = calculateTotals([{ id: 'tee-black', size: 'M', qty: 2 }, { id: 'tee-black', size: 'G', qty: 1 }, { id: 'hoodie', size: 'GG', qty: 1 }]);
   assert.equal(result.subtotal, 48960); assert.equal(result.quantity, 4); assert.equal(result.lines.length, 3);

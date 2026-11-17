@@ -1,0 +1,5 @@
+[functions.griff-admin]
+# The handler verifies current JWTs with getUser() and checks the administrator
+# allowlist. The legacy gateway verifier only accepts legacy-secret-signed tokens.
+# Public storefront data is exposed separately through a restricted SQL RPC.
+verify_jwt = false
