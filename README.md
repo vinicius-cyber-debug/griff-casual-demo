@@ -78,12 +78,18 @@ O envio de foto é independente do cadastro: uma foto enviada pode continuar na 
 ## Limites operacionais
 
 - Pagamentos e estornos são registros manuais de operações realizadas fora do sistema. O painel não cobra cartões nem movimenta dinheiro.
-- A sacola e o checkout público continuam demonstrativos; vendas reais podem ser cadastradas pelo operador no painel. Não há emissão de nota fiscal, integração de transportadoras ou conciliação bancária.
+- O checkout público abre o WhatsApp com peças, tamanhos, cores, quantidades, subtotal, nome opcional e preferência de recebimento. O cliente precisa enviar a mensagem. A abertura não registra venda, reserva estoque ou confirma pagamento. Após combinar com o cliente, o operador cadastra a venda no painel. O catálogo inicial continua ilustrativo; substitua os produtos e preços antes da operação comercial. Não há emissão de nota fiscal, integração de transportadoras ou conciliação bancária.
 - O resultado financeiro é uma estimativa: receita paga menos frete, custo das peças vendidas e despesas cadastradas. Cadastre taxas e impostos como despesas. Estornos deixam de compor a receita paga.
 - A versão foi feita para uma loja pequena: até 1.000 produtos, 5.000 pedidos e um documento de dados de até 8 MB. Os últimos 500 eventos de atividade e 2.000 movimentos de estoque ficam no painel. Para maior volume, migre os registros para tabelas normalizadas e mantenha um histórico completo separado.
 - Exportar JSON salva os dados e as referências das fotos; mantenha cópia dos arquivos do Storage separadamente. Não há restauração automática de backups nesta versão.
 - A atualização do catálogo aparece na próxima leitura da vitrine. Use o botão Atualizar dados no painel para buscar alterações de outra sessão.
 - O envio de links de login está sujeito aos limites de e-mail do Supabase. Para operação comercial, configure seu próprio SMTP e acompanhe as cotas do plano.
+
+## WhatsApp do checkout
+
+O destino público está em `public/runtime.js`, na propriedade `checkoutWhatsApp`, atualmente `+55 92 98520-7901`. Para trocar, edite esse valor, execute `npm run build:pages` e publique no GitHub. O campo Telefone de contato nas configurações administrativas permanece como contato interno: o catálogo público atual do Supabase não expõe esse campo. A edição do destino do checkout diretamente pelo painel exige atualizar essa projeção pública no banco; não é necessário para o checkout atual.
+
+O link usa `wa.me` com mensagem codificada. O subtotal vem dos preços e variantes disponíveis no catálogo carregado, nunca dos preços gravados na sacola. Frete e valor final são confirmados pela loja. Nome e observações ficam na memória da página até o cliente abrir o WhatsApp; a sacola continua salva no navegador. A mensagem é um pedido de atendimento, não comprovante de compra ou pagamento.
 
 ## Identidade e fotografias
 
