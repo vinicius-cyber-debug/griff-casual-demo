@@ -62,13 +62,28 @@ export function applyCommand(previous, command, options = {}) {
     case 'categories.save': { const name = requireText(data.name, 'o nome da categoria', 60); if (state.categories.some(c => c.toLowerCase() === name.toLowerCase() && c !== data.old)) fail('Categoria já cadastrada.'); if (data.old) { if (!state.categories.includes(data.old)) fail('Categoria não encontrada.'); state.categories = state.categories.map(c => c === data.old ? name : c); state.products.forEach(p => { if (p.category === data.old) p.category = name; }); } else state.categories.push(name); description = `Salvou a categoria ${name}`; break; }
     case 'categories.delete': { if (state.products.some(p => p.category === data.name)) fail('Esta categoria tem produtos. Altere a categoria deles antes de removê-la.'); state.categories = state.categories.filter(c => c !== data.name); description = `Removeu a categoria ${data.name}`; break; }
     case 'customers.save': { const payload = customerPayload(data); const old = state.customers.find(c => c.id === data.id); const customer = { ...old, ...payload, id: old?.id || crypto.randomUUID(), createdAt: old?.createdAt || at }; if (old) state.customers[state.customers.findIndex(c => c.id === old.id)] = customer; else state.customers.unshift(customer); description = `Salvou o cliente ${customer.name}`; break; }
-    case 'orders.create': {
+    case 'orders.create':
+    case 'pos.checkout': {
+      const pos = command.type === 'pos.checkout';
+      if (pos) {
+        if (typeof data.reference !== 'string' || !/^[a-zA-Z0-9-]{8,80}$/.test(data.reference)) fail('Identificador da venda inválido.');
+        if (state.orders.some(o => o.posReference === data.reference)) return previous;
+        if (data.confirmReceived !== true) fail('Confirme o recebimento do pagamento para concluir a venda presencial.');
+        if (data.shipping !== 0) fail('A venda presencial não inclui frete.');
+      }
       const quote = orderQuote(state, data, new Date(at)); const customer = data.customerId ? state.customers.find(c => c.id === data.customerId) || fail('Cliente não encontrado.') : { ...customerPayload(data.customer || {}), id: null };
+      if (pos && integer(data.expectedTotal, 'Total conferido') !== quote.total) fail('O total mudou. Confira os itens e o desconto antes de concluir.');
+      const receivedAmount = pos && data.method === 'cash' ? integer(data.receivedAmount, 'Valor recebido') : quote.total;
+      if (pos && receivedAmount < quote.total) fail('O valor recebido em dinheiro é menor que o total da venda.');
       if (!customer.id && data.saveCustomer === true) { customer.id = crypto.randomUUID(); customer.createdAt = at; state.customers.unshift(structuredClone(customer)); }
       if (!Object.keys(paymentLabels).includes(data.method || 'pix')) fail('Forma de pagamento inválida.');
       const order = { ...quote, id: crypto.randomUUID(), number: `GRF-${++state.sequence}`, customer: structuredClone(customer), status: 'pending', payment: data.paid ? 'paid' : 'pending', method: data.method || 'pix', createdAt: at, updatedAt: at, paidAt: data.paid ? at : null, channel: clean(data.channel, 30) || 'manual', notes: clean(data.notes, 2000), tracking: '', stockRestored: false, events: [{ at, actor, text: 'Pedido cadastrado; estoque reservado.' }] };
-      for (const item of order.items) { const p = availableProduct(state, item.productId); const v = p.variants.find(v => v.id === item.variantId); v.stock -= item.qty; logMovement(state, p, v, -item.qty, `Reserva · ${order.number}`, at, actor); }
-      state.orders.unshift(order); description = `Cadastrou o pedido ${order.number}`; break;
+      if (pos) {
+        Object.assign(order, {status:'delivered',payment:'paid',paidAt:at,channel:'presencial',posReference:data.reference,receivedAmount,change:receivedAmount-quote.total});
+        order.events = [{at,actor,text:'Venda presencial concluída. Recebimento confirmado manualmente pelo operador; peças entregues.'}];
+      }
+      for (const item of order.items) { const p = availableProduct(state, item.productId); const v = p.variants.find(v => v.id === item.variantId); v.stock -= item.qty; logMovement(state, p, v, -item.qty, `${pos ? 'Venda presencial' : 'Reserva'} · ${order.number}`, at, actor); }
+      state.orders.unshift(order); description = pos ? `Concluiu a venda presencial ${order.number}` : `Cadastrou o pedido ${order.number}`; break;
     }
     case 'orders.update': {
       const order = state.orders.find(o => o.id === data.id) || fail('Pedido não encontrado.'); const changes = [];

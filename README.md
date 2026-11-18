@@ -69,6 +69,16 @@ As tabelas administrativas têm RLS e nenhum acesso direto de `anon` ou `authent
 
 ## Como o estoque e as vendas funcionam
 
+### PDV e uso pelo celular
+
+Abra `#/admin/pdv` ou toque em **PDV** na navegação inferior. Busque pelo nome, SKU do produto ou SKU da variação; escolha tamanho e cor; confira a sacola. O cliente é opcional: sem identificação, a venda usa “Cliente balcão” e não cria um contato na agenda. Cupons usam as mesmas regras do painel. Escolha Pix, cartão ou dinheiro; para dinheiro, informe o valor recebido e confira o troco.
+
+O operador deve confirmar que recebeu o pagamento fora do sistema e entregou as peças. A operação `pos.checkout` registra pagamento, entrega, baixa de estoque e histórico na mesma transação. O servidor confere preços, estoque, cupom, total e recebimento em dinheiro. Uma referência única impede repetir a mesma venda, mesmo depois de reconectar com outro identificador de comando. Uma resposta incerta bloqueia mudanças na venda até verificar o registro. A sacola e uma eventual tentativa pendente ficam no `sessionStorage` daquela aba; mantenha-a aberta até confirmar o resultado. O PDV real exige conexão com a internet.
+
+O resumo pode ser impresso ou salvo como PDF pelo navegador e reimpresso nos detalhes do pedido. Ele não é nota fiscal. Não há cobrança de Pix/cartão, integração com maquininha, emissão fiscal ou gestão de abertura e fechamento de caixa. Registre taxas e despesas no financeiro.
+
+No celular, Início, PDV, Produtos e Pedidos ficam na barra inferior; **Mais** abre todas as opções. Tabelas viram cartões com rótulos, formulários têm campos maiores e o PDV separa escolha de peças e conferência da sacola. A vitrine também tem alvos de toque maiores. A demonstração `?demo=1#/admin/pdv` usa dados locais; o modo **CONEXÃO SEGURA** usa a conta administradora e o banco da loja.
+
 Criar um pedido reserva o estoque imediatamente. O cancelamento de um pedido pendente devolve as peças uma única vez. Pedidos pagos precisam de registro de estorno/devolução. O operador escolhe se as peças voltam ao estoque. Tamanhos e cores de uma variação com histórico não podem ser reaproveitados; crie uma variação nova.
 
 Os preços do pedido são definidos pelo servidor a partir do catálogo e ficam registrados no histórico, mesmo depois de editar o produto. As atualizações usam uma versão do banco e uma transação para impedir perda de alterações simultâneas e venda com estoque negativo. Após conflito, atualize os dados e revise a operação.

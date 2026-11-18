@@ -12,7 +12,7 @@ export async function handler(request) {
   const origin=request.headers.get('origin');if(origin&&!origins.has(origin))return json(request,{error:'Origem não autorizada.'},403);if(request.method==='OPTIONS')return new Response(null,{status:204,headers:headersFor(request)});
   try {
     const db=adminClient();const route=new URL(request.url).pathname.split('/').filter(Boolean).pop();
-    if(route==='health'&&request.method==='GET')return json(request,{ok:true,version:'2.0.0'});
+    if(route==='health'&&request.method==='GET')return json(request,{ok:true,version:'2.1.0',features:['pos.checkout']});
     if(route==='catalog'&&request.method==='GET'){const current=await snapshot(db);return json(request,publicCatalog(current.state));}
     const auth=await authorized(request,db);if(auth.error)return json(request,{error:auth.error},auth.status);
     if(route==='session'&&request.method==='GET')return json(request,{user:auth.user});
