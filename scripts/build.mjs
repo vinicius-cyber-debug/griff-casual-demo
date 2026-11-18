@@ -2,6 +2,7 @@ import * as esbuild from 'esbuild';
 import { readFile, writeFile, mkdir, rm, cp } from 'node:fs/promises';
 import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pages = process.argv.includes('--pages');
@@ -25,4 +26,10 @@ if (serve) {
   console.log('Após editar o código, atualize a página para ver as alterações.');
   const shutdown = async () => { await context.dispose(); process.exit(0); };
   process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
-} else await esbuild.build(options);
+} else {
+  await esbuild.build(options);
+  const fingerprint = createHash('sha256');
+  for (const path of ['assets/app.js', 'assets/app.css', 'runtime.js']) fingerprint.update(await readFile(resolve(output, path)));
+  const version = fingerprint.digest('hex').slice(0, 12);
+  await writeFile(resolve(output, 'index.html'), html.replace('./assets/app.js', `./assets/app.js?v=${version}`).replace('./assets/app.css', `./assets/app.css?v=${version}`).replace('./runtime.js', `./runtime.js?v=${version}`));
+}
