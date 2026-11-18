@@ -3,6 +3,7 @@ import { useStore } from './store.jsx';
 import { money } from './shop.js';
 import { paymentLabels, productImage, statusLabels } from './domain.js';
 import { changePosQuantity, posPayment, posProducts, posQuote, readPosDraft } from './pos.js';
+import {effectiveProduct} from './commerce.js';
 import './pos.css';
 
 function VariantPicker({ product, onSelect, onClose, error }) {
@@ -62,8 +63,9 @@ export default function PointOfSale({ onOpenOrder }) {
   if (draft.items.length) { try {quote = posQuote(state,draft.items,coupon);} catch(e) {quoteError = e.message;} }
   const payment = posPayment(quote,method,received);
   const quantity = draft.items.reduce((sum,row) => sum+row.qty,0);
-  const products = posProducts(state,query,category);
+  const products = posProducts(state,query,category).map(p=>effectiveProduct(p,state.promotions||[]));
   const selectedProduct = state.products.find(p => p.id === selected);
+  const pricedSelectedProduct = selectedProduct ? effectiveProduct(selectedProduct,state.promotions||[]) : null;
   const currentTotal = quote?.total || 0;
 
   function persist(value) { sessionStorage.setItem(storageKey,JSON.stringify(value)); }
@@ -128,7 +130,8 @@ export default function PointOfSale({ onOpenOrder }) {
       {notice && <p className="pos-notice" role="status">{notice}</p>}
       {!draft.items.length ? <div className="ad-empty pos-cart-empty"><span aria-hidden="true">＋</span><h3>A próxima venda começa aqui.</h3><p>Escolha uma roupa e selecione tamanho e cor.</p></div> : <>
         <div className="pos-cart-lines">{draft.items.map(row => {
-          const product = state.products.find(p => p.id === row.productId);
+          const rawProduct = state.products.find(p => p.id === row.productId);
+          const product = rawProduct ? effectiveProduct(rawProduct,state.promotions||[]) : null;
           const variant = product?.variants.find(v => v.id === row.variantId);
           const label = `${product?.name || 'Roupa indisponível'}, ${variant?.color || ''}/${variant?.size || ''}`;
           return <div className="pos-cart-line" key={`${row.productId}-${row.variantId}`}><img src={productImage(product)} alt=""/><div><strong>{product?.name || 'Roupa indisponível'}</strong><small>{variant ? `${variant.color} / ${variant.size}` : 'Variação indisponível'}</small><b>{money((product?.price || 0)*row.qty)}</b><div className="pos-quantity"><button aria-label={`Diminuir ${label}`} disabled={locked} onClick={() => change(row.productId,row.variantId,-1)}>−</button><output aria-label={`Quantidade de ${label}`}>{row.qty}</output><button aria-label={`Aumentar ${label}`} disabled={locked || !variant || row.qty >= Math.min(999,variant.stock)} onClick={() => change(row.productId,row.variantId,1)}>+</button></div></div><button className="ad-icon pos-remove" aria-label={`Remover ${label}`} disabled={locked} onClick={() => remove(row.productId,row.variantId)}>×</button></div>;
@@ -155,6 +158,6 @@ export default function PointOfSale({ onOpenOrder }) {
       {error && !draft.items.length && <p className="ad-error" role="alert">{error}</p>}
     </section>
     {quantity > 0 && <button className="pos-mobile-cart ad-button primary" onClick={() => {setStep('cart');window.scrollTo({top:0,behavior:'smooth'});}}><span>Ver sacola ({quantity})</span><strong>{money(currentTotal)}</strong><span aria-hidden="true">→</span></button>}
-    {selectedProduct && <VariantPicker error={error} product={selectedProduct} onClose={() => setSelected(null)} onSelect={(productId,variantId) => {if(change(productId,variantId,1))setSelected(null);}}/>}
+    {selectedProduct && <VariantPicker error={error} product={pricedSelectedProduct} onClose={() => setSelected(null)} onSelect={(productId,variantId) => {if(change(productId,variantId,1))setSelected(null);}}/>}
   </div>;
 }

@@ -69,6 +69,17 @@ As tabelas administrativas têm RLS e nenhum acesso direto de `anon` ou `authent
 
 ## Como o estoque e as vendas funcionam
 
+### Promoções, compras, clientes e marketing
+
+- **Promoções:** seleção de roupas, desconto percentual ou em reais por peça e vigência pelo calendário de Manaus. Entre ofertas simultâneas, aplica-se o menor preço; o preço mínimo é R$ 0,01. Cupons podem ser aplicados sobre o preço promocional. Vitrine, sacola, WhatsApp e PDV usam o preço efetivo, e o servidor refaz a conta antes de registrar a venda. O preço base e os custos de vendas antigas são preservados.
+- **Peças paradas:** estoque disponível sem venda paga válida há 30/60/90/180 dias. Sem venda anterior, usa a data do cadastro ou da última entrada. Exclui estoque zero e arquivados; não representa idade individual de lotes.
+- **Compras e fornecedores:** cadastro de fornecedor, compra por variação, recebimento e pagamento manual separados. Receber soma estoque e recalcula custo médio ponderado; repetir a confirmação não duplica entrada. Compras recebidas não são editadas/canceladas, e uma compra paga não pode ser cancelada. Não há recebimento parcial ou estorno de compra nesta versão. Valores a pagar são separados de despesas operacionais, pois o custo das peças já entra no resultado quando vendidas.
+- **Histórico do cliente:** pedidos vinculados pelo ID do cadastro, valores recebidos, ticket, última compra e tamanhos. Nome ou e-mail iguais não associam compras automaticamente. Selecione o cliente no PDV para vincular a venda.
+- **Marketing:** calendário de campanhas, canal, peças, mensagem e anotações internas. O texto pode ser gerado a partir dos preços atuais, copiado ou exportado. Publicação e envio são manuais; não há anúncios pagos ou disparos automáticos.
+- **Banners:** até cinco ativos, com imagem enviada para o Storage ou escolhida da biblioteca, textos, botão, destino e ordem. O carrossel é controlado por setas; sem banners ativos, permanece a apresentação original.
+
+Dados legados recebem as novas coleções na próxima alteração, sem apagar o catálogo ou os pedidos. O endpoint público `GET /functions/v1/griff-admin/catalog` expõe somente catálogo, promoções, banners e nome/Instagram da loja; o frontend atual usa esse endpoint. A RPC SQL anterior continua disponível para compatibilidade. Compras, fornecedores, campanhas internas e clientes permanecem privados.
+
 ### PDV e uso pelo celular
 
 Abra `#/admin/pdv` ou toque em **PDV** na navegação inferior. Busque pelo nome, SKU do produto ou SKU da variação; escolha tamanho e cor; confira a sacola. O cliente é opcional: sem identificação, a venda usa “Cliente balcão” e não cria um contato na agenda. Cupons usam as mesmas regras do painel. Escolha Pix, cartão ou dinheiro; para dinheiro, informe o valor recebido e confira o troco.

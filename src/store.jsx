@@ -23,10 +23,7 @@ const runtime = window.__GRIFF_RUNTIME__ || {};
 const cloudEnabled = runtime.mode === 'supabase' && runtime.url && runtime.publishableKey && new URLSearchParams(location.search).get('demo') !== '1';
 const supabase = cloudEnabled ? createClient(runtime.url, runtime.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
 async function cloudAPI(path, token, options = {}) {
-  if (path === 'catalog') {
-    const response = await fetch(`${runtime.url}/rest/v1/rpc/griff_public_catalog`, { method:'POST', headers:{ apikey:runtime.publishableKey, 'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{}) }, body:'{}' });
-    const result = await response.json(); if (!response.ok || !result?.products) throw new Error('Não foi possível carregar o catálogo da loja. Tente novamente.'); return result;
-  }
+
   const response = await fetch(`${runtime.url}/functions/v1/${runtime.functionName || 'griff-admin'}/${path}`, { ...options, headers: { apikey: runtime.publishableKey, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } });
   const result = await response.json().catch(() => ({ error: 'O servidor retornou uma resposta inválida.' }));
   if (!response.ok) { const error = new Error(result.error || 'Não foi possível acessar o servidor.'); error.status = response.status; throw error; }
@@ -38,7 +35,7 @@ function CloudStoreProvider({ children }) {
   async function refresh(explicitSession) {
     const active = explicitSession === undefined ? sessionRef.current : explicitSession; const stamp=++generation.current;setError('');setAuthError('');
     try { let result; let verified=null; if(active?.access_token) { try { const info=await cloudAPI('session',active.access_token); verified=info.user; result=await cloudAPI('state',active.access_token); } catch(e) { if(e.status===401||e.status===403)setAuthError(e.message);else throw e; } }
-      if(!result){const catalog=await cloudAPI('catalog');result={version:0,state:{...emptyState(),products:catalog.products.map(p=>({...p,cost:0})),settings:{...emptyState().settings,...catalog.settings}}};}
+      if(!result){const catalog=await cloudAPI('catalog');result={version:0,state:{...emptyState(),promotions:catalog.promotions||[],banners:catalog.banners||[],products:catalog.products.map(p=>({...p,cost:0})),settings:{...emptyState().settings,...catalog.settings}}};}
       if(stamp!==generation.current)return;current.current=result;setSnapshot(result);setUser(verified);if(verified&&new URLSearchParams(location.search).get('admin')==='1'&&!location.hash.startsWith('#/admin'))location.hash='/admin';
     }catch(e){if(stamp===generation.current)setError(e.message);}finally{if(stamp===generation.current)setLoading(false);}
   }

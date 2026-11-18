@@ -1,6 +1,8 @@
 import { products as referenceProducts } from './shop.js';
+import { BusinessError } from './errors.js';
+export { BusinessError } from './errors.js';
+import { applyCommerceCommand, ensureCommerceState, effectiveProduct } from './commerce.js';
 
-export class BusinessError extends Error {}
 const fail = message => { throw new BusinessError(message); };
 const clean = (value, limit = 200) => String(value ?? '').trim().slice(0, limit);
 const requireText = (value, label, max = 200) => clean(value, max) || fail(`Informe ${label}.`);
@@ -10,7 +12,7 @@ export function toCents(value) { const text = String(value ?? '').trim().replace
 export const dateLabel = value => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', timeZone: 'America/Manaus' }).format(new Date(value.length === 10 ? `${value}T12:00:00Z` : value));
 export const statusLabels = { pending: 'Pendente', preparing: 'Em preparação', shipped: 'Enviado', delivered: 'Entregue', canceled: 'Cancelado', returned: 'Devolvido', paid: 'Pago', refunded: 'Estornado', active: 'Ativo', draft: 'Rascunho', archived: 'Arquivado' };
 export const paymentLabels = { pix: 'Pix', cash: 'Dinheiro', card: 'Cartão', transfer: 'Transferência', other: 'Outro' };
-export function emptyState() { return { schema: 1, products: [], categories: ['Camisetas', 'Moletons', 'Calças', 'Jaquetas', 'Acessórios'], customers: [], orders: [], coupons: [], expenses: [], media: [], movements: [], activity: [], appliedCommands: [], sequence: 1000, settings: { name: 'Griff Casual', email: '', phone: '', instagram: 'https://www.instagram.com/griff.casual/', address: '', currency: 'BRL', lowStock: 3 } }; }
+export function emptyState() { return { schema: 1, promotions: [], suppliers: [], purchases: [], campaigns: [], banners: [], products: [], categories: ['Camisetas', 'Moletons', 'Calças', 'Jaquetas', 'Acessórios'], customers: [], orders: [], coupons: [], expenses: [], media: [], movements: [], activity: [], appliedCommands: [], sequence: 1000, settings: { name: 'Griff Casual', email: '', phone: '', instagram: 'https://www.instagram.com/griff.casual/', address: '', currency: 'BRL', lowStock: 3 } }; }
 export function seedProducts() { return referenceProducts.map((p, index) => ({ ...p, sku: `GRF-${String(index + 1).padStart(3, '0')}`, cost: Math.round(p.price * .45), compareAt: 0, status: 'active', category: p.category, images: [`images/${p.image}.jpg`], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), variants: p.sizes.map((size, i) => ({ id: `${p.id}-${i}`, size, color: p.id.includes('white') || p.id === 'cap' ? 'Branco' : p.id === 'hoodie' ? 'Cinza' : p.id === 'cargo' ? 'Cáqui' : p.id === 'jacket' ? 'Oliva' : 'Preto', sku: `GRF-${index + 1}-${i + 1}`, stock: index === 0 && i === 0 ? 2 : 8 + i * 2 })) })); }
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value ?? '') && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)) ? value : fail('Informe uma data válida.');
 function imagePath(value, demo) { const image = clean(value, 1800000); if (/^(images\/[a-zA-Z0-9_.-]+\.(jpg|png|webp)|https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/griff-products\/[a-zA-Z0-9-]+\.(jpg|png|webp))$/.test(image) || (demo && /^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(image))) return image; fail('Imagem inválida. Use o envio de imagens do painel.'); }
@@ -21,7 +23,7 @@ function restoreStock(state, order, reason, at, actor) { if (order.stockRestored
 export function orderQuote(state, input, now = new Date()) {
   if (!Array.isArray(input.items) || !input.items.length || input.items.length > 100) fail('Adicione pelo menos um item ao pedido.');
   const items = [];
-  for (const row of input.items) { const product = availableProduct(state, row.productId); if (product.status !== 'active') fail(`${product.name} não está disponível para venda.`); const variant = product.variants.find(v => v.id === row.variantId) || fail('Escolha uma variação válida.'); const qty = integer(row.qty, 'Quantidade', 1, 999); const duplicate = items.find(i => i.productId === product.id && i.variantId === variant.id); if (duplicate) duplicate.qty += qty; else items.push({ productId: product.id, variantId: variant.id, name: product.name, size: variant.size, color: variant.color, sku: variant.sku, qty, unitPrice: product.price, unitCost: product.cost }); }
+  for (const row of input.items) { const product = effectiveProduct(availableProduct(state, row.productId), state.promotions || [], now); if (product.status !== 'active') fail(`${product.name} não está disponível para venda.`); const variant = product.variants.find(v => v.id === row.variantId) || fail('Escolha uma variação válida.'); const qty = integer(row.qty, 'Quantidade', 1, 999); const duplicate = items.find(i => i.productId === product.id && i.variantId === variant.id); if (duplicate) duplicate.qty += qty; else items.push({ productId: product.id, variantId: variant.id, name: product.name, size: variant.size, color: variant.color, sku: variant.sku, qty, unitPrice: product.price, unitCost: product.cost }); }
   for (const item of items) { const p = availableProduct(state, item.productId); const v = p.variants.find(v => v.id === item.variantId); if (item.qty > v.stock) fail(`Estoque insuficiente: ${p.name}, ${v.color}/${v.size}. Disponível: ${v.stock}.`); }
   const subtotal = items.reduce((n, i) => n + i.qty * i.unitPrice, 0);
   let discount = 0; let coupon = null;
@@ -34,7 +36,7 @@ export function applyCommand(previous, command, options = {}) {
   if (!command || typeof command.type !== 'string') fail('Operação inválida.');
   if (!command.id || !/^[a-zA-Z0-9-]{8,80}$/.test(command.id)) fail('Identificador da operação inválido.');
   if (previous.appliedCommands.includes(command.id)) return previous;
-  const state = structuredClone(previous); const data = command.data ?? {}; const actor = clean(options.actor || 'Administrador', 180); const at = (options.now || new Date()).toISOString(); let description = '';
+  const state = ensureCommerceState(structuredClone(previous)); const data = command.data ?? {}; const actor = clean(options.actor || 'Administrador', 180); const at = (options.now || new Date()).toISOString(); let description = '';
   switch (command.type) {
     case 'products.save': {
       const old = data.id ? state.products.find(p => p.id === data.id) : null; if (data.id && !old) fail('Produto não encontrado.');
@@ -49,6 +51,7 @@ export function applyCommand(previous, command, options = {}) {
       if (new Set(variants.map(v => v.sku)).size !== variants.length) fail('Os SKUs das variações devem ser diferentes.');
       if (old) for (const v of old.variants) if (!variants.some(x => x.id === v.id) && (v.stock || state.orders.some(o => o.items.some(i => i.variantId === v.id)))) fail('Uma variação com estoque ou histórico de venda não pode ser removida. Mantenha-a com estoque zero.');
       if (old) for (const v of variants) { const prior = old.variants.find(x => x.id === v.id); if (prior && (prior.size !== v.size || prior.color !== v.color) && state.orders.some(o => o.items.some(i => i.variantId === v.id))) fail('Uma variação com histórico de venda não pode mudar de tamanho ou cor. Cadastre uma nova variação.'); }
+      if (old) for (const v of old.variants) { const next=variants.find(x=>x.id===v.id); if ((!next || next.size!==v.size || next.color!==v.color) && state.purchases.some(p=>p.status==='ordered'&&p.items.some(i=>i.productId===old.id&&i.variantId===v.id))) fail('Esta variação faz parte de uma compra em aberto. Receba ou cancele a compra antes de alterar a variação.'); }
       const images = Array.isArray(data.images) ? data.images.slice(0, 5).map(v => imagePath(v, options.demo)) : [];
       const price = integer(data.price, 'Preço', 1); const compareAt = integer(data.compareAt ?? 0, 'Preço anterior'); if (compareAt && compareAt <= price) fail('O preço anterior deve ser maior que o preço de venda.');
       const product = { id: old?.id || crypto.randomUUID(), name: requireText(data.name, 'o nome da roupa', 140), sku, category: data.category, collection: clean(data.collection, 60) || 'Griff Casual', description: clean(data.description, 3000), price, cost: integer(data.cost ?? 0, 'Custo'), compareAt, status: data.status, badge: clean(data.badge, 25), images, variants, sizes: [...new Set(variants.map(v => v.size))], colors: old?.colors || ['#242824'], alt: clean(data.alt, 200) || clean(data.name, 140), createdAt: old?.createdAt || at, updatedAt: at };
@@ -100,7 +103,7 @@ export function applyCommand(previous, command, options = {}) {
     case 'settings.save': { const lowStock = integer(data.lowStock, 'Alerta de estoque', 0, 1000); const instagram = clean(data.instagram, 200); if (instagram && !/^https:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._/]+$/.test(instagram)) fail('Informe um link válido do Instagram.'); const email = clean(data.email, 180); if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('E-mail inválido.'); state.settings = { name: requireText(data.name, 'o nome da loja', 100), email, phone: clean(data.phone, 30), instagram, address: clean(data.address, 500), currency: 'BRL', lowStock }; description = 'Atualizou as configurações da loja'; break; }
     case 'media.add': { if (!Array.isArray(data.media) || data.media.length > 5) fail('Envie até 5 imagens por vez.'); for (const item of data.media) { const url = imagePath(item.url, options.demo); if (!state.media.some(m => m.url === url)) state.media.unshift({ id: crypto.randomUUID(), url, name: clean(item.name, 100) || 'Imagem', createdAt: at }); } description = 'Adicionou imagens à biblioteca'; break; }
     case 'catalog.seed': { if (state.products.length) fail('O catálogo de exemplo só pode ser importado quando não há produtos.'); state.products = seedProducts(); description = 'Importou o catálogo ilustrativo'; break; }
-    default: fail('Operação não reconhecida.');
+    default: {description = applyCommerceCommand(state,command.type,data,{at,actor,demo:options.demo,imagePath,logMovement});if(description === undefined)fail('Operação não reconhecida.');}
   }
   state.appliedCommands = [...state.appliedCommands.slice(-199), command.id];
   state.activity.unshift({ id: crypto.randomUUID(), at, actor, description }); state.activity = state.activity.slice(0, 500);
